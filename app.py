@@ -1,0 +1,207 @@
+"""
+Office Attendance Tracker
+A simple system to track and stay on top of your office attendance.
+"""
+import sqlite3
+import os
+from datetime import datetime, timedelta
+from pathlib import Path
+
+from flask import Flask, render_template, request, jsonify
+
+app = Flask(__name__)
+DB_PATH = Path(__file__).parent / "attendance.db"
+
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = get_db()
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL UNIQUE,
+            check_in TEXT,
+            check_out TEXT,
+            notes TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        INSERT OR IGNORE INTO settings (key, value) VALUES 
+            ('required_days_per_week', '2'),
+            ('reminder_enabled', 'true');
+    """)
+    conn.commit()
+    conn.close()
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/api/attendance", methods=["GET"])
+def get_attendance():
+    """Get attendance records, optionally filtered by date range."""
+    start = request.args.get("start")
+    end = request.args.get("end")
+    conn = get_db()
+    cur = conn.cursor()
+    if start and end:
+        cur.execute(
+            "SELECT * FROM attendance WHERE date BETWEEN ? AND ? ORDER BY date DESC",
+            (start, end),
+        )
+    elif start:
+        cur.execute(
+            "SELECT * FROM attendance WHERE date >= ? ORDER BY date DESC",
+            (start,),
+        )
+    elif end:
+        cur.execute(
+            "SELECT * FROM attendance WHERE date <= ? ORDER BY date DESC",
+            (end,),
+        )
+    else:
+        cur.execute("SELECT * FROM attendance ORDER BY date DESC LIMIT 180")
+    rows = cur.fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/attendance", methods=["POST"])
+def add_attendance():
+    """Add or update an attendance record."""
+    data = request.get_json()
+    date = data.get("date")
+    check_in = data.get("check_in", "")
+    check_out = data.get("check_out", "")
+    notes = data.get("notes", "")
+    if not date:
+        return jsonify({"error": "Date is required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO attendance (date, check_in, check_out, notes)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(date) DO UPDATE SET
+            check_in = excluded.check_in,
+            check_out = excluded.check_out,
+            notes = excluded.notes
+        """,
+        (date, check_in, check_out, notes),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/api/attendance/<date_str>", methods=["DELETE"])
+def delete_attendance(date_str):
+    """Delete an attendance record."""
+    conn = get_db()
+    conn.execute("DELETE FROM attendance WHERE date = ?", (date_str,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/api/stats")
+def get_stats():
+    """Get attendance statistics for the current week and overall."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT value FROM settings WHERE key = 'required_days_per_week'")
+    row = cur.fetchone()
+    required = int(row["value"]) if row else 3
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    week_start = (datetime.now() - timedelta(days=datetime.now().weekday())).strftime(
+        "%Y-%m-%d"
+    )
+    week_end = (
+        datetime.now() + timedelta(days=6 - datetime.now().weekday())
+    ).strftime("%Y-%m-%d")
+
+    # A day counts as attended if there's a record for that date.
+    # (Times are optional; users often only know which days they attended.)
+    cur.execute(
+        "SELECT COUNT(*) as count FROM attendance WHERE date BETWEEN ? AND ?",
+        (week_start, week_end),
+    )
+    days_this_week = cur.fetchone()["count"]
+
+    cur.execute("SELECT COUNT(*) as count FROM attendance")
+    total_days = cur.fetchone()["count"]
+
+    cur.execute("SELECT date FROM attendance ORDER BY date DESC LIMIT 1")
+    last_attendance = cur.fetchone()
+    last_date = last_attendance["date"] if last_attendance else None
+
+    cur.execute("SELECT 1 FROM attendance WHERE date = ?", (today,))
+    today_logged = cur.fetchone() is not None
+
+    conn.close()
+
+    return jsonify(
+        {
+            "days_this_week": days_this_week,
+            "required_per_week": required,
+            "total_days": total_days,
+            "last_attendance_date": last_date,
+            "today_logged": today_logged,
+            "week_start": week_start,
+            "week_end": week_end,
+        }
+    )
+
+
+@app.route("/api/settings", methods=["GET"])
+def get_settings():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT key, value FROM settings")
+    rows = cur.fetchall()
+    conn.close()
+    return jsonify({r["key"]: r["value"] for r in rows})
+
+
+@app.route("/api/settings", methods=["POST"])
+def update_settings():
+    data = request.get_json()
+    conn = get_db()
+    for key, value in data.items():
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+            (key, str(value)),
+        )
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/api/export")
+def export_csv():
+    """Export attendance as CSV."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT date, check_in, check_out, notes FROM attendance ORDER BY date")
+    rows = cur.fetchall()
+    conn.close()
+    lines = ["date,check_in,check_out,notes"]
+    for r in rows:
+        lines.append(f"{r['date']},{r['check_in'] or ''},{r['check_out'] or ''},{r['notes'] or ''}")
+    return "\n".join(lines), 200, {"Content-Type": "text/csv", "Content-Disposition": "attachment; filename=attendance.csv"}
+
+
+if __name__ == "__main__":
+    init_db()
+    app.run(debug=True, port=5000)

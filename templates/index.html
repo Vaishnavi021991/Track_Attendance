@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaishnavi’s Office Attendance Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <h1>Vaishnavi’s Office Attendance Tracker.</h1>
+            <p class="subtitle">
+                Working in Prezzee. Attendance compliance target is <strong>80%</strong> and more.
+            </p>
+            <button class="btn btn-icon" id="settingsBtn" title="Settings">⚙️</button>
+        </header>
+
+        <section class="stats">
+            <div class="stat-card stat-primary">
+                <span class="stat-value" id="daysThisWeek">0</span>
+                <span class="stat-label">Days this week</span>
+                <span class="stat-target">/ <span id="requiredDays">3</span> required</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="totalDays">0</span>
+                <span class="stat-label">Total days logged</span>
+            </div>
+            <div class="stat-card" id="todayCard">
+                <span class="stat-value" id="todayStatus">—</span>
+                <span class="stat-label">Today</span>
+            </div>
+            <div class="stat-card" id="cumulativeCard">
+                <span class="stat-value" id="cumulativePct">0%</span>
+                <span class="stat-label" id="cumulativeLabel">Cumulative</span>
+                <span class="stat-target" id="cumulativeDetail">0/0 (min 80%)</span>
+            </div>
+        </section>
+
+        <div class="compliance-bar" id="complianceBar">
+            <div class="compliance-fill" id="complianceFill"></div>
+            <span class="compliance-text" id="complianceText">0% of weekly target</span>
+        </div>
+
+        <section class="attendance-section" style="margin-top: 1.25rem;">
+            <h2>Weekly graph (from Mar 1)</h2>
+            <div class="chart-wrap">
+                <div class="chart" id="weeklyChart" aria-label="Weekly attendance chart"></div>
+                <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-swatch ok"></span> On track</span>
+                    <span class="legend-item"><span class="legend-swatch warn"></span> Below 80%</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="actions">
+            <button class="btn btn-primary" id="logTodayBtn">Log today's attendance</button>
+            <button class="btn btn-ghost" id="addPastDateBtn">Add past date</button>
+        </section>
+
+        <section class="attendance-section">
+            <h2>Attendance history</h2>
+            <div class="table-wrap">
+                <table class="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Check in</th>
+                            <th>Check out</th>
+                            <th>Notes</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceBody">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <div class="modal" id="logModal">
+        <div class="modal-content">
+            <h3 id="modalTitle">Log attendance</h3>
+            <form id="logForm">
+                <input type="hidden" id="logDate">
+                <div class="form-group" id="datePickerGroup" style="display: none;">
+                    <label for="logDateInput">Date</label>
+                    <input type="date" id="logDateInput" name="date">
+                </div>
+                <div class="form-group">
+                    <label for="logCheckIn">Check in</label>
+                    <input type="time" id="logCheckIn" name="check_in">
+                </div>
+                <div class="form-group">
+                    <label for="logCheckOut">Check out</label>
+                    <input type="time" id="logCheckOut" name="check_out">
+                </div>
+                <div class="form-group">
+                    <label for="logNotes">Notes (optional)</label>
+                    <input type="text" id="logNotes" name="notes" placeholder="e.g. WFH morning, office afternoon">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-ghost" id="cancelLog">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <h3>Settings</h3>
+            <form id="settingsForm">
+                <div class="form-group">
+                    <label>Your agreed days per week (HR)</label>
+                    <div class="preset-buttons">
+                        <button type="button" class="preset-btn" data-days="2">Exemption: 2 days</button>
+                        <button type="button" class="preset-btn" data-days="3">Standard: 3 days</button>
+                    </div>
+                    <input type="number" id="requiredDaysInput" name="required_days" min="1" max="7" value="2" style="margin-top: 0.5rem;">
+                </div>
+                <p class="settings-note">This tracker is set up for Vaishnavi. (Presets are kept for convenience.)</p>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-ghost" id="closeSettings">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <a href="/api/export" class="link">Export CSV</a>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
