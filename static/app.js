@@ -46,7 +46,11 @@ function formatDate(str) {
 }
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function march1Str() {
@@ -85,7 +89,6 @@ async function loadStats() {
   document.getElementById("daysThisWeek").textContent = s.days_this_week;
   document.getElementById("requiredDays").textContent = s.required_per_week;
   document.getElementById("totalDays").textContent = s.total_days;
-
   const todayCard = document.getElementById("todayCard");
   const todayStatus = document.getElementById("todayStatus");
   if (s.today_logged) {
@@ -121,6 +124,7 @@ async function loadWeeklyGraphAndCumulative() {
   const end = todayStr();
   const rows = await API.getAttendance(start, end);
   const attendedDates = new Set(rows.map((r) => r.date));
+  const rowsByDate = new Map(rows.map((r) => [r.date, r]));
 
   // Cumulative compliance by completed weeks only:
   // - By end of this week => includes 2 weeks (last + this)
@@ -172,28 +176,35 @@ async function loadWeeklyGraphAndCumulative() {
     weeks.push({ ws, we, attended, pct });
   }
 
+  // Scale: 5 days = 100% height for each bar
+  const maxDays = 5;
   const chart = document.getElementById("weeklyChart");
   chart.innerHTML = "";
   weeks.slice(-14).forEach((w) => {
+    const group = document.createElement("div");
+    group.className = "bar-group";
+    const officePct = Math.round((w.attended / maxDays) * 100);
+
+    const barRow = document.createElement("div");
+    barRow.className = "bar-group-row";
     const bar = document.createElement("div");
-    bar.className = "bar" + (w.pct < minPct ? " warn" : "");
+    bar.className = "bar bar-office" + (w.pct < minPct ? " warn" : "");
     const fill = document.createElement("div");
     fill.className = "bar-fill";
-    fill.style.height = `${clamp(w.pct, 0, 120)}%`;
-
+    fill.style.height = `${clamp(officePct, 0, 120)}%`;
     const label = document.createElement("div");
     label.className = "bar-label";
-    label.textContent = `${w.attended}/${required}`;
-
-    const week = document.createElement("div");
-    week.className = "bar-week";
-    week.textContent = w.ws.slice(5); // MM-DD
-
-    bar.title = `Week ${w.ws} to ${w.we}\nAttended: ${w.attended}\nTarget: ${required}\nCompliance: ${w.pct}%`;
+    label.textContent = w.attended;
+    bar.title = `Week ${w.ws} to ${w.we}\n${w.attended}/${required} days`;
     bar.appendChild(fill);
-    bar.appendChild(week);
     bar.appendChild(label);
-    chart.appendChild(bar);
+    barRow.appendChild(bar);
+    group.appendChild(barRow);
+    const weekLabel = document.createElement("div");
+    weekLabel.className = "bar-week";
+    weekLabel.textContent = w.ws.slice(5);
+    group.appendChild(weekLabel);
+    chart.appendChild(group);
   });
 }
 
@@ -202,7 +213,7 @@ async function loadAttendance() {
   const tbody = document.getElementById("attendanceBody");
   if (rows.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="5" class="empty-state">No attendance logged yet. Click "Log today\'s attendance" to start.</td></tr>';
+      '<tr><td colspan="6" class="empty-state">No attendance logged yet. Click "Log today\'s attendance" to start.</td></tr>';
     return;
   }
   tbody.innerHTML = rows

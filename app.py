@@ -6,6 +6,10 @@ import sqlite3
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+# Use Sydney time for "today" and week boundaries
+TIMEZONE = ZoneInfo("Australia/Sydney")
 
 from flask import Flask, render_template, request, jsonify
 
@@ -25,6 +29,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS attendance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL UNIQUE,
+            work_type TEXT NOT NULL DEFAULT 'office',
             check_in TEXT,
             check_out TEXT,
             notes TEXT,
@@ -38,6 +43,11 @@ def init_db():
             ('required_days_per_week', '2'),
             ('reminder_enabled', 'true');
     """)
+    # Add work_type column for existing DBs (SQLite has no IF NOT EXISTS for columns)
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM pragma_table_info('attendance') WHERE name='work_type'")
+    if cur.fetchone() is None:
+        conn.execute("ALTER TABLE attendance ADD COLUMN work_type TEXT NOT NULL DEFAULT 'office'")
     conn.commit()
     conn.close()
 
@@ -90,9 +100,10 @@ def add_attendance():
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO attendance (date, check_in, check_out, notes)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO attendance (date, work_type, check_in, check_out, notes)
+        VALUES (?, 'office', ?, ?, ?)
         ON CONFLICT(date) DO UPDATE SET
+            work_type = 'office',
             check_in = excluded.check_in,
             check_out = excluded.check_out,
             notes = excluded.notes
@@ -114,22 +125,23 @@ def delete_attendance(date_str):
     return jsonify({"success": True})
 
 
+def _now_sydney():
+    return datetime.now(TIMEZONE)
+
+
 @app.route("/api/stats")
 def get_stats():
-    """Get attendance statistics for the current week and overall."""
+    """Get attendance statistics for the current week and overall (Sydney time)."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT value FROM settings WHERE key = 'required_days_per_week'")
     row = cur.fetchone()
     required = int(row["value"]) if row else 3
 
-    today = datetime.now().strftime("%Y-%m-%d")
-    week_start = (datetime.now() - timedelta(days=datetime.now().weekday())).strftime(
-        "%Y-%m-%d"
-    )
-    week_end = (
-        datetime.now() + timedelta(days=6 - datetime.now().weekday())
-    ).strftime("%Y-%m-%d")
+    now = _now_sydney()
+    today = now.strftime("%Y-%m-%d")
+    week_start = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
+    week_end = (now + timedelta(days=6 - now.weekday())).strftime("%Y-%m-%d")
 
     # A day counts as attended if there's a record for that date.
     # (Times are optional; users often only know which days they attended.)
@@ -193,12 +205,13 @@ def export_csv():
     """Export attendance as CSV."""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT date, check_in, check_out, notes FROM attendance ORDER BY date")
+    cur.execute("SELECT date, work_type, check_in, check_out, notes FROM attendance ORDER BY date")
     rows = cur.fetchall()
     conn.close()
-    lines = ["date,check_in,check_out,notes"]
+    lines = ["date,work_type,check_in,check_out,notes"]
     for r in rows:
-        lines.append(f"{r['date']},{r['check_in'] or ''},{r['check_out'] or ''},{r['notes'] or ''}")
+        wt = r.get("work_type") or "office"
+        lines.append(f"{r['date']},{wt},{r['check_in'] or ''},{r['check_out'] or ''},{r['notes'] or ''}")
     return "\n".join(lines), 200, {"Content-Type": "text/csv", "Content-Disposition": "attachment; filename=attendance.csv"}
 
 

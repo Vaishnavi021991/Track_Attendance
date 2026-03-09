@@ -231,21 +231,52 @@ body {
 }
 
 .chart {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
+    display: flex;
+    flex-wrap: nowrap;
     gap: 6px;
-    align-items: end;
+    align-items: flex-end;
     height: 140px;
     padding: 0.5rem 0.25rem;
 }
 
+.bar-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.bar-group-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    height: 120px;
+}
+
+.bar-group .bar {
+    width: 12px;
+    min-width: 12px;
+    max-width: 12px;
+    height: 100%;
+}
+
+.bar-group .bar-week {
+    position: static;
+    transform: none;
+    font-size: 0.65rem;
+    color: rgba(139, 148, 158, 0.95);
+}
+
 .bar {
     position: relative;
-    border-radius: 6px;
+    border-radius: 3px;
     border: 1px solid var(--border);
     background: var(--bg);
     height: 100%;
+    min-height: 24px;
     overflow: hidden;
 }
 
@@ -255,11 +286,14 @@ body {
     right: 0;
     bottom: 0;
     height: 0%;
-    background: var(--success);
     transition: height 0.3s ease;
 }
 
-.bar.warn .bar-fill {
+.bar-office .bar-fill {
+    background: var(--accent);
+}
+
+.bar.warn.bar-office .bar-fill {
     background: var(--warning);
 }
 
@@ -314,6 +348,10 @@ body {
 
 .legend-swatch.warn {
     background: var(--warning);
+}
+
+.legend-swatch.legend-office {
+    background: var(--accent);
 }
 
 .table-wrap {
@@ -419,10 +457,22 @@ body {
     font-size: 0.95rem;
 }
 
-.form-group input:focus {
+.form-group input:focus,
+.form-group select:focus {
     outline: none;
     border-color: rgba(255, 46, 110, 0.55);
     box-shadow: 0 0 0 4px rgba(255, 46, 110, 0.12);
+}
+
+.form-group select {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: rgba(17, 24, 39, 0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.95rem;
 }
 
 .preset-buttons {
