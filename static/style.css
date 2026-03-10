@@ -260,6 +260,81 @@ body {
     color: var(--text-muted);
 }
 
+.forecast-card {
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 1.1rem 1.25rem;
+    margin: 1rem 0;
+    background: var(--surface);
+    box-shadow: 0 10px 18px rgba(17, 24, 39, 0.06);
+}
+
+.forecast-card.forecast-success {
+    border-color: rgba(22, 163, 74, 0.4);
+    background: linear-gradient(135deg, rgba(22, 163, 74, 0.08) 0%, rgba(22, 163, 74, 0.03) 100%), var(--surface);
+}
+
+.forecast-card.forecast-danger {
+    border-color: rgba(239, 68, 68, 0.4);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.03) 100%), var(--surface);
+}
+
+.forecast-card.forecast-normal {
+    border-color: rgba(255, 46, 110, 0.25);
+    background: linear-gradient(135deg, rgba(255, 46, 110, 0.06) 0%, rgba(124, 58, 237, 0.04) 100%), var(--surface);
+}
+
+.forecast-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.forecast-headline {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.forecast-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.badge-success { background: rgba(22, 163, 74, 0.12); color: var(--success); }
+.badge-danger  { background: rgba(239, 68, 68, 0.12); color: var(--danger); }
+.badge-normal  { background: rgba(255, 46, 110, 0.10); color: var(--accent); }
+
+.forecast-bar-wrap {
+    margin-bottom: 0.5rem;
+}
+
+.forecast-bar {
+    height: 6px;
+    background: rgba(17, 24, 39, 0.07);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.forecast-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+    transition: width 0.4s ease;
+}
+
+.forecast-success .forecast-fill { background: linear-gradient(90deg, var(--success), rgba(22, 163, 74, 0.7)); }
+.forecast-danger  .forecast-fill { background: linear-gradient(90deg, var(--danger), var(--warning)); }
+
+.forecast-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
 .wifi-row {
     margin: 0.5rem 0 1.5rem;
 }

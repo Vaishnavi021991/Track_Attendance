@@ -242,6 +242,72 @@ def get_wifi():
     return jsonify({"ssid": ssid, "office_ssid": office_ssid, "at_office": at_office})
 
 
+@app.route("/api/forecast")
+def get_forecast():
+    """Calculate how many more office days are needed to hit 80% by Jun 30."""
+    import math
+    from datetime import date as date_type
+
+    PERIOD_START = "2026-03-02"
+    PERIOD_END   = "2026-06-30"
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT value FROM settings WHERE key = 'required_days_per_week'")
+    row = cur.fetchone()
+    required = int(row["value"]) if row else 2
+
+    now = _now_sydney()
+    today = now.strftime("%Y-%m-%d")
+
+    # Count total Mon-Sun weeks that overlap the period
+    ps = date_type.fromisoformat(PERIOD_START)
+    pe = date_type.fromisoformat(PERIOD_END)
+    total_weeks = 0
+    d = ps
+    while d <= pe:
+        total_weeks += 1
+        d += timedelta(days=7)
+
+    total_required = total_weeks * required
+    min_target = math.ceil(total_required * 0.80)
+
+    # Office days logged in period so far
+    cap = min(today, PERIOD_END)
+    cur.execute(
+        "SELECT COUNT(*) as count FROM attendance WHERE date BETWEEN ? AND ? AND work_type = 'office'",
+        (PERIOD_START, cap),
+    )
+    office_in_period = cur.fetchone()["count"]
+    conn.close()
+
+    days_still_needed = max(0, min_target - office_in_period)
+    target_achieved = days_still_needed == 0
+
+    # Remaining weeks from this week's Monday through period end
+    today_date = date_type.fromisoformat(min(today, PERIOD_END))
+    week_start_today = today_date - timedelta(days=today_date.weekday())
+    remaining_weeks = 0
+    d = week_start_today
+    while d <= pe:
+        remaining_weeks += 1
+        d += timedelta(days=7)
+
+    max_possible_remaining = remaining_weeks * required
+    still_achievable = max_possible_remaining >= days_still_needed
+
+    return jsonify({
+        "total_weeks": total_weeks,
+        "total_required": total_required,
+        "min_target": min_target,
+        "office_in_period": office_in_period,
+        "days_still_needed": days_still_needed,
+        "target_achieved": target_achieved,
+        "remaining_weeks": remaining_weeks,
+        "still_achievable": still_achievable,
+    })
+
+
 @app.route("/api/export")
 def export_csv():
     """Export attendance as CSV."""

@@ -33,6 +33,10 @@ const API = {
     const res = await fetch("/api/wifi");
     return res.json();
   },
+  async getForecast() {
+    const res = await fetch("/api/forecast");
+    return res.json();
+  },
   async updateSettings(data) {
     await fetch("/api/settings", {
       method: "POST",
@@ -98,6 +102,7 @@ function showToast(msg) {
 function reload() {
   loadStats();
   loadWeeklyGraphAndCumulative();
+  loadForecast();
 }
 
 // ── Stats ──────────────────────────────────────────────────────────────────
@@ -262,6 +267,40 @@ settingsModal.onclick = (e) => {
   if (e.target === settingsModal) settingsModal.classList.remove("open");
 };
 
+// ── Forecast ───────────────────────────────────────────────────────────────
+
+async function loadForecast() {
+  const f = await API.getForecast();
+  const card     = document.getElementById("forecastCard");
+  const headline = document.getElementById("forecastHeadline");
+  const badge    = document.getElementById("forecastBadge");
+  const fill     = document.getElementById("forecastFill");
+  const sub      = document.getElementById("forecastSub");
+
+  const progress = Math.min(100, Math.round((f.office_in_period / f.min_target) * 100));
+  fill.style.width = `${progress}%`;
+
+  if (f.target_achieved) {
+    card.className = "forecast-card forecast-success";
+    headline.textContent = `You've hit the 80% target — well done!`;
+    badge.textContent = "Achieved ✓";
+    badge.className = "forecast-badge badge-success";
+    sub.textContent = `${f.office_in_period} of ${f.min_target} required office days logged (${f.total_weeks} weeks, ${f.total_required} total required)`;
+  } else if (!f.still_achievable) {
+    card.className = "forecast-card forecast-danger";
+    headline.textContent = `Need ${f.days_still_needed} more office days — target at risk`;
+    badge.textContent = "At risk";
+    badge.className = "forecast-badge badge-danger";
+    sub.textContent = `${f.office_in_period} / ${f.min_target} days logged · only ${f.remaining_weeks} week${f.remaining_weeks === 1 ? "" : "s"} left`;
+  } else {
+    card.className = "forecast-card forecast-normal";
+    headline.textContent = `${f.days_still_needed} more office day${f.days_still_needed === 1 ? "" : "s"} needed by Jun 30`;
+    badge.textContent = "On track";
+    badge.className = "forecast-badge badge-normal";
+    sub.textContent = `${f.office_in_period} / ${f.min_target} days logged · ${f.remaining_weeks} week${f.remaining_weeks === 1 ? "" : "s"} remaining`;
+  }
+}
+
 // ── WiFi status indicator ──────────────────────────────────────────────────
 
 async function loadWifiStatus() {
@@ -327,6 +366,7 @@ async function autoLogIfNeeded() {
 async function init() {
   await loadStats();
   await loadWeeklyGraphAndCumulative();
+  await loadForecast();
   await autoLogIfNeeded();
   await loadWifiStatus();
 }
