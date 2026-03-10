@@ -92,7 +92,6 @@ function showToast(msg) {
 
 function reload() {
   loadStats();
-  loadAttendance();
   loadWeeklyGraphAndCumulative();
 }
 
@@ -228,52 +227,6 @@ async function loadWeeklyGraphAndCumulative() {
   });
 }
 
-// ── Attendance table ───────────────────────────────────────────────────────
-
-async function loadAttendance() {
-  const rows = await API.getAttendance();
-  const tbody = document.getElementById("attendanceBody");
-  if (rows.length === 0) {
-    tbody.innerHTML =
-      '<tr><td colspan="5" class="empty-state">No attendance logged yet. Open the app at work or home — it auto-logs based on WiFi.</td></tr>';
-    return;
-  }
-
-  const typeBadge = (wt) => {
-    const labels = { office: "Office", remote: "Remote", leave: "Leave" };
-    return `<span class="type-badge type-${wt}">${labels[wt] || wt}</span>`;
-  };
-
-  tbody.innerHTML = rows
-    .map(
-      (r) => `
-    <tr>
-      <td>${formatDate(r.date)}</td>
-      <td>${typeBadge(r.work_type)}</td>
-      <td>${r.check_in || "—"}</td>
-      <td>${r.notes || "—"}</td>
-      <td class="actions-cell">
-        <button class="btn btn-ghost btn-sm edit-btn" data-date="${r.date}">Edit</button>
-        <button class="btn btn-ghost btn-sm delete-btn" data-date="${r.date}">Delete</button>
-      </td>
-    </tr>
-  `
-    )
-    .join("");
-
-  tbody.querySelectorAll(".edit-btn").forEach((b) => {
-    const row = rows.find((r) => r.date === b.dataset.date);
-    b.onclick = () => openLogModal(b.dataset.date, row);
-  });
-  tbody.querySelectorAll(".delete-btn").forEach((b) => {
-    b.onclick = async () => {
-      if (confirm("Delete this record?")) {
-        await API.deleteAttendance(b.dataset.date);
-        reload();
-      }
-    };
-  });
-}
 
 // ── Log modal (past dates + edits only) ───────────────────────────────────
 
@@ -460,7 +413,6 @@ async function autoLogIfNeeded() {
 
 async function init() {
   await loadStats();
-  await loadAttendance();
   await loadWeeklyGraphAndCumulative();
   await autoLogIfNeeded();
   await loadWifiStatus();
