@@ -293,14 +293,11 @@ async function autoLogIfNeeded() {
     if (dow === 0 || dow === 6) return; // skip weekends
 
     const [wifi, stats] = await Promise.all([API.getWifi(), API.getStats()]);
-    // Never overwrite a leave record
-    if (stats.today_type === "leave") return;
-
     const checkIn = currentTimeStr();
 
     if (wifi.at_office) {
-      // On Corp-Network: log or upgrade remote → office
-      if (!stats.today_logged || stats.today_type === "remote") {
+      // Corp-Network always wins — office overrides remote or leave
+      if (!stats.today_logged || stats.today_type !== "office") {
         await API.saveAttendance({ date: todayStr(), work_type: "office", check_in: checkIn, check_out: "", notes: "" });
         showToast(`Office day logged · Check-in: ${checkIn}`);
         reload();
