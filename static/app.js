@@ -18,9 +18,6 @@ const API = {
     if (!res.ok) throw new Error((await res.json()).error || "Failed to save");
     return res.json();
   },
-  async deleteAttendance(date) {
-    await fetch(`/api/attendance/${date}`, { method: "DELETE" });
-  },
   async getStats() {
     const res = await fetch("/api/stats");
     return res.json();
@@ -45,16 +42,6 @@ const API = {
     });
   },
 };
-
-function formatDate(str) {
-  const d = new Date(str + "T12:00:00");
-  return d.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 function todayStr() {
   const d = new Date();
@@ -323,8 +310,7 @@ async function loadWifiStatus() {
 }
 
 // ── Auto-log based on WiFi ─────────────────────────────────────────────────
-// Weekdays only. Office WiFi → log/upgrade to office. Other WiFi → log as remote.
-// Never overwrites a leave record. Never runs on weekends.
+// Weekdays only. Office IP prefix → log/upgrade to office. Other IP → log as remote. No IP → leave.
 
 async function autoLogIfNeeded() {
   try {

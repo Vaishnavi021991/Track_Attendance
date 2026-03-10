@@ -3,7 +3,6 @@ Office Attendance Tracker
 A simple system to track and stay on top of your office attendance.
 """
 import sqlite3
-import os
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -180,8 +179,6 @@ def get_stats():
             "required_per_week": required,
             "today_logged": today_logged,
             "today_type": today_type,
-            "week_start": week_start,
-            "week_end": week_end,
         }
     )
 
