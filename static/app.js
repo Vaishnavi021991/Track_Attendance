@@ -424,22 +424,30 @@ async function autoLogIfNeeded() {
     if (dow === 0 || dow === 6) return; // skip weekends
 
     const [wifi, stats] = await Promise.all([API.getWifi(), API.getStats()]);
-    if (!wifi.ssid) return; // no wifi, skip
+    // Never overwrite a leave record
+    if (stats.today_type === "leave") return;
 
     const checkIn = currentTimeStr();
 
     if (wifi.at_office) {
-      // At office: log or upgrade from remote → office (don't touch leave)
+      // On Corp-Network: log or upgrade remote → office
       if (!stats.today_logged || stats.today_type === "remote") {
         await API.saveAttendance({ date: todayStr(), work_type: "office", check_in: checkIn, check_out: "", notes: "" });
         showToast(`Office day logged · Check-in: ${checkIn}`);
         reload();
       }
-    } else {
-      // At home: only log if not yet logged for today
+    } else if (wifi.ssid) {
+      // On some other network: log as remote
       if (!stats.today_logged) {
         await API.saveAttendance({ date: todayStr(), work_type: "remote", check_in: checkIn, check_out: "", notes: "" });
-        showToast(`Remote day logged · Working from home`);
+        showToast(`Remote day logged · ${wifi.ssid}`);
+        reload();
+      }
+    } else {
+      // No network detected on a weekday: log as leave
+      if (!stats.today_logged) {
+        await API.saveAttendance({ date: todayStr(), work_type: "leave", check_in: "", check_out: "", notes: "" });
+        showToast("No network detected — logged as leave");
         reload();
       }
     }
