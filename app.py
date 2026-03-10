@@ -43,8 +43,12 @@ def init_db():
         INSERT OR IGNORE INTO settings (key, value) VALUES
             ('required_days_per_week', '2'),
             ('reminder_enabled', 'true'),
-            ('office_wifi_ssid', '');
+            ('office_wifi_ssid', 'ts Corp Network');
     """)
+    # Migrate empty office_wifi_ssid to the correct default
+    conn.execute(
+        "UPDATE settings SET value = 'ts Corp Network' WHERE key = 'office_wifi_ssid' AND value = ''"
+    )
     # Add work_type column for existing DBs (SQLite has no IF NOT EXISTS for columns)
     cur = conn.cursor()
     cur.execute("SELECT 1 FROM pragma_table_info('attendance') WHERE name='work_type'")

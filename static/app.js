@@ -356,6 +356,30 @@ settingsModal.onclick = (e) => {
   if (e.target === settingsModal) settingsModal.classList.remove("open");
 };
 
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 4000);
+}
+
+async function autoLogIfAtOffice() {
+  try {
+    const [wifi, stats] = await Promise.all([API.getWifi(), API.getStats()]);
+    if (wifi.at_office && !stats.today_logged) {
+      const now = new Date();
+      const checkIn = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      await API.saveAttendance({ date: todayStr(), check_in: checkIn, check_out: "", notes: "" });
+      showToast(`Auto-logged — you're at the office! Check-in: ${checkIn}`);
+      loadStats();
+      loadAttendance();
+      loadWeeklyGraphAndCumulative();
+    }
+  } catch {
+    // silently skip if wifi check fails
+  }
+}
+
 async function loadWifiStatus() {
   const el = document.getElementById("wifiStatus");
   try {
@@ -382,6 +406,7 @@ async function init() {
   await loadStats();
   await loadAttendance();
   await loadWeeklyGraphAndCumulative();
+  await autoLogIfAtOffice();
   await loadWifiStatus();
 }
 
