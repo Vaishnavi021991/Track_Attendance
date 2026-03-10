@@ -308,7 +308,7 @@ async function loadWifiStatus() {
   try {
     const w = await API.getWifi();
     if (!w.ssid) {
-      el.textContent = "No WiFi detected";
+      el.textContent = w.wifi_disconnected ? "WiFi not connected" : "No WiFi interface found";
       el.className = "wifi-status wifi-unknown";
     } else if (w.at_office) {
       el.textContent = `At office · ${w.ssid}`;

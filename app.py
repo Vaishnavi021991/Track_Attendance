@@ -218,6 +218,7 @@ def update_settings():
 def get_wifi():
     """Detect current WiFi SSID and whether it matches the configured office network."""
     ssid = None
+    wifi_disconnected = False
     for iface in ["en0", "en1", "en2"]:
         try:
             result = subprocess.run(
@@ -228,6 +229,8 @@ def get_wifi():
             if output.startswith("Current Wi-Fi Network:"):
                 ssid = output.split(":", 1)[1].strip()
                 break
+            elif "not associated" in output.lower():
+                wifi_disconnected = True  # interface exists but not connected
         except Exception:
             continue
 
@@ -239,7 +242,7 @@ def get_wifi():
     conn.close()
 
     at_office = bool(ssid and office_ssid and ssid == office_ssid)
-    return jsonify({"ssid": ssid, "office_ssid": office_ssid, "at_office": at_office})
+    return jsonify({"ssid": ssid, "office_ssid": office_ssid, "at_office": at_office, "wifi_disconnected": wifi_disconnected})
 
 
 @app.route("/api/forecast")
