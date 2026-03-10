@@ -4,6 +4,7 @@ A simple system to track and stay on top of your office attendance.
 """
 import sqlite3
 import os
+import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -39,9 +40,10 @@ def init_db():
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
-        INSERT OR IGNORE INTO settings (key, value) VALUES 
+        INSERT OR IGNORE INTO settings (key, value) VALUES
             ('required_days_per_week', '2'),
-            ('reminder_enabled', 'true');
+            ('reminder_enabled', 'true'),
+            ('office_wifi_ssid', '');
     """)
     # Add work_type column for existing DBs (SQLite has no IF NOT EXISTS for columns)
     cur = conn.cursor()
@@ -198,6 +200,34 @@ def update_settings():
     conn.commit()
     conn.close()
     return jsonify({"success": True})
+
+
+@app.route("/api/wifi")
+def get_wifi():
+    """Detect current WiFi SSID and whether it matches the configured office network."""
+    ssid = None
+    for iface in ["en0", "en1", "en2"]:
+        try:
+            result = subprocess.run(
+                ["networksetup", "-getairportnetwork", iface],
+                capture_output=True, text=True, timeout=3
+            )
+            output = result.stdout.strip()
+            if output.startswith("Current Wi-Fi Network:"):
+                ssid = output.split(":", 1)[1].strip()
+                break
+        except Exception:
+            continue
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT value FROM settings WHERE key = 'office_wifi_ssid'")
+    row = cur.fetchone()
+    office_ssid = row["value"] if row else ""
+    conn.close()
+
+    at_office = bool(ssid and office_ssid and ssid == office_ssid)
+    return jsonify({"ssid": ssid, "office_ssid": office_ssid, "at_office": at_office})
 
 
 @app.route("/api/export")

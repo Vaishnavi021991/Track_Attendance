@@ -46,7 +46,7 @@
         </div>
 
         <section class="attendance-section" style="margin-top: 1.25rem;">
-            <h2>Weekly graph (from Mar 1)</h2>
+            <h2>Weekly graph <span class="period-label">Mar 2 – Jun 30, 2026</span></h2>
             <div class="chart-wrap">
                 <div class="chart" id="weeklyChart" aria-label="Weekly attendance chart"></div>
                 <div class="chart-legend">
@@ -60,6 +60,7 @@
         <section class="actions">
             <button class="btn btn-primary" id="logTodayBtn">Log today's attendance</button>
             <button class="btn btn-ghost" id="addPastDateBtn">Add past date</button>
+            <div id="wifiStatus" class="wifi-status wifi-unknown"></div>
         </section>
 
         <section class="attendance-section">
@@ -122,6 +123,11 @@
                         <button type="button" class="preset-btn" data-days="3">Standard: 3 days</button>
                     </div>
                     <input type="number" id="requiredDaysInput" name="required_days" min="1" max="7" value="2" style="margin-top: 0.5rem;">
+                </div>
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label for="officeWifiInput">Office WiFi network name</label>
+                    <input type="text" id="officeWifiInput" name="office_wifi_ssid" placeholder="e.g. Prezzee-Office">
+                    <span class="settings-hint">Used to detect if you're at the office</span>
                 </div>
                 <p class="settings-note">This tracker is set up for Vaishnavi. (Presets are kept for convenience.)</p>
                 <div class="form-actions">

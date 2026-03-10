@@ -1,3 +1,6 @@
+const PERIOD_START = "2026-03-02"; // First Monday of the FY tracking period
+const PERIOD_END   = "2026-06-30"; // End of financial year tracking period
+
 const API = {
   async getAttendance(start, end) {
     const params = new URLSearchParams();
@@ -24,6 +27,10 @@ const API = {
   },
   async getSettings() {
     const res = await fetch("/api/settings");
+    return res.json();
+  },
+  async getWifi() {
+    const res = await fetch("/api/wifi");
     return res.json();
   },
   async updateSettings(data) {
@@ -119,9 +126,8 @@ async function loadWeeklyGraphAndCumulative() {
   const required = Number(s.required_per_week || 2);
   const minPct = 80;
 
-  // Use the first Monday on/after Mar 1 so we don't count the partial week before it.
-  const start = firstMondayOnOrAfter(march1Str());
-  const end = todayStr();
+  const start = PERIOD_START;
+  const end = todayStr() < PERIOD_END ? todayStr() : PERIOD_END;
   const rows = await API.getAttendance(start, end);
   const attendedDates = new Set(rows.map((r) => r.date));
   const rowsByDate = new Map(rows.map((r) => [r.date, r]));
@@ -319,6 +325,7 @@ const settingsForm = document.getElementById("settingsForm");
 document.getElementById("settingsBtn").onclick = async () => {
   const s = await API.getSettings();
   document.getElementById("requiredDaysInput").value = s.required_days_per_week || 2;
+  document.getElementById("officeWifiInput").value = s.office_wifi_ssid || "";
   settingsModal.classList.add("open");
 };
 
@@ -334,10 +341,12 @@ document.getElementById("closeSettings").onclick = () =>
 settingsForm.onsubmit = async (e) => {
   e.preventDefault();
   const required = document.getElementById("requiredDaysInput").value;
-  await API.updateSettings({ required_days_per_week: required });
+  const officeWifi = document.getElementById("officeWifiInput").value.trim();
+  await API.updateSettings({ required_days_per_week: required, office_wifi_ssid: officeWifi });
   settingsModal.classList.remove("open");
   loadStats();
   loadWeeklyGraphAndCumulative();
+  loadWifiStatus();
 };
 
 logModal.onclick = (e) => {
@@ -347,10 +356,33 @@ settingsModal.onclick = (e) => {
   if (e.target === settingsModal) settingsModal.classList.remove("open");
 };
 
+async function loadWifiStatus() {
+  const el = document.getElementById("wifiStatus");
+  try {
+    const w = await API.getWifi();
+    if (!w.office_ssid) {
+      el.textContent = "Set office WiFi in settings";
+      el.className = "wifi-status wifi-unknown";
+    } else if (!w.ssid) {
+      el.textContent = "WiFi not detected";
+      el.className = "wifi-status wifi-unknown";
+    } else if (w.at_office) {
+      el.textContent = `At office · ${w.ssid}`;
+      el.className = "wifi-status wifi-office";
+    } else {
+      el.textContent = `At home · ${w.ssid}`;
+      el.className = "wifi-status wifi-home";
+    }
+  } catch {
+    el.textContent = "";
+  }
+}
+
 async function init() {
   await loadStats();
   await loadAttendance();
   await loadWeeklyGraphAndCumulative();
+  await loadWifiStatus();
 }
 
 init();
