@@ -58,58 +58,16 @@
             <div class="chart-wrap">
                 <div class="chart" id="weeklyChart" aria-label="Weekly attendance chart"></div>
                 <div class="chart-legend">
-                    <span class="legend-item"><span class="legend-swatch legend-office"></span> Office</span>
-                    <span class="legend-item"><span class="legend-swatch legend-remote"></span> Remote</span>
                     <span class="legend-item"><span class="legend-swatch ok"></span> On track (≥80%)</span>
                     <span class="legend-item"><span class="legend-swatch warn"></span> Below 80%</span>
                 </div>
             </div>
         </section>
 
-        <section class="actions">
-            <button class="btn btn-ghost btn-leave" id="markLeaveBtn">Mark today as leave</button>
-            <button class="btn btn-ghost" id="addPastDateBtn">Add / edit past date</button>
+        <div class="wifi-row">
             <div id="wifiStatus" class="wifi-status wifi-unknown"></div>
-        </section>
-
-    </div>
-
-    <!-- Log modal (past dates / edits) -->
-    <div class="modal" id="logModal">
-        <div class="modal-content">
-            <h3 id="modalTitle">Add past date</h3>
-            <form id="logForm">
-                <input type="hidden" id="logDate">
-                <div class="form-group" id="datePickerGroup" style="display: none;">
-                    <label for="logDateInput">Date</label>
-                    <input type="date" id="logDateInput" name="date">
-                </div>
-                <div class="form-group">
-                    <label for="logWorkType">Type</label>
-                    <select id="logWorkType" name="work_type">
-                        <option value="office">Office</option>
-                        <option value="remote">Remote</option>
-                        <option value="leave">Leave</option>
-                    </select>
-                </div>
-                <div class="form-group" id="checkInGroup">
-                    <label for="logCheckIn">Check in</label>
-                    <input type="time" id="logCheckIn" name="check_in">
-                </div>
-                <div class="form-group" id="checkOutGroup">
-                    <label for="logCheckOut">Check out</label>
-                    <input type="time" id="logCheckOut" name="check_out">
-                </div>
-                <div class="form-group">
-                    <label for="logNotes">Notes (optional)</label>
-                    <input type="text" id="logNotes" name="notes" placeholder="Optional note">
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-ghost" id="cancelLog">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </div>
-            </form>
         </div>
+
     </div>
 
     <!-- Settings modal -->

@@ -79,6 +79,11 @@ function addDaysStr(dateStr, days) {
   return d.toISOString().slice(0, 10);
 }
 
+function fmtWeekLabel(dateStr) {
+  const d = new Date(dateStr + "T12:00:00");
+  return d.toLocaleDateString("en-AU", { month: "short", day: "numeric" });
+}
+
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
@@ -188,7 +193,7 @@ async function loadWeeklyGraphAndCumulative() {
     weeks.push({ ws, we, office, remote, leave, pct });
   }
 
-  // Chart: office bar + remote bar side by side, 5 days = 100% height
+  // Chart: office-only bars, 5 days = 100% height
   const maxDays = 5;
   const chart = document.getElementById("weeklyChart");
   chart.innerHTML = "";
@@ -199,116 +204,28 @@ async function loadWeeklyGraphAndCumulative() {
     const barRow = document.createElement("div");
     barRow.className = "bar-group-row";
 
-    const makeBar = (type, count) => {
-      const bar = document.createElement("div");
-      bar.className = `bar bar-${type}${type === "office" && w.pct < minPct ? " warn" : ""}`;
-      const fill = document.createElement("div");
-      fill.className = "bar-fill";
-      fill.style.height = `${clamp(Math.round((count / maxDays) * 100), 0, 120)}%`;
-      const label = document.createElement("div");
-      label.className = "bar-label";
-      label.textContent = count || "";
-      bar.title = `Week ${w.ws}\nOffice: ${w.office}  Remote: ${w.remote}  Leave: ${w.leave}\nOffice target: ${w.office}/${required}`;
-      bar.appendChild(fill);
-      bar.appendChild(label);
-      return bar;
-    };
-
-    barRow.appendChild(makeBar("office", w.office));
-    barRow.appendChild(makeBar("remote", w.remote));
+    const bar = document.createElement("div");
+    bar.className = `bar bar-office${w.pct < minPct ? " warn" : ""}`;
+    const fill = document.createElement("div");
+    fill.className = "bar-fill";
+    fill.style.height = `${clamp(Math.round((w.office / maxDays) * 100), 0, 120)}%`;
+    const label = document.createElement("div");
+    label.className = "bar-label";
+    label.textContent = w.office || "";
+    bar.title = `Week of ${fmtWeekLabel(w.ws)}\nOffice: ${w.office}/${required}  Remote: ${w.remote}  Leave: ${w.leave}`;
+    bar.appendChild(fill);
+    bar.appendChild(label);
+    barRow.appendChild(bar);
     group.appendChild(barRow);
 
     const weekLabel = document.createElement("div");
     weekLabel.className = "bar-week";
-    weekLabel.textContent = w.ws.slice(5);
+    weekLabel.textContent = fmtWeekLabel(w.ws);
     group.appendChild(weekLabel);
     chart.appendChild(group);
   });
 }
 
-
-// ── Log modal (past dates + edits only) ───────────────────────────────────
-
-const logModal = document.getElementById("logModal");
-const logForm = document.getElementById("logForm");
-const modalTitle = document.getElementById("modalTitle");
-
-function toggleLeaveFields(isLeave) {
-  document.getElementById("checkInGroup").style.display = isLeave ? "none" : "";
-  document.getElementById("checkOutGroup").style.display = isLeave ? "none" : "";
-}
-
-async function openLogModal(date, existing) {
-  const datePickerGroup = document.getElementById("datePickerGroup");
-  const dateInput = document.getElementById("logDateInput");
-  const isPastDate = !date && !existing;
-
-  if (isPastDate) {
-    datePickerGroup.style.display = "block";
-    dateInput.required = true;
-    dateInput.value = "";
-    document.getElementById("logDate").value = "";
-    modalTitle.textContent = "Add past date";
-  } else {
-    datePickerGroup.style.display = "none";
-    dateInput.required = false;
-    document.getElementById("logDate").value = date;
-    modalTitle.textContent = `Edit ${formatDate(date)}`;
-  }
-
-  const wt = existing?.work_type || "office";
-  document.getElementById("logWorkType").value = wt;
-  toggleLeaveFields(wt === "leave");
-  document.getElementById("logCheckIn").value = existing?.check_in || "";
-  document.getElementById("logCheckOut").value = existing?.check_out || "";
-  document.getElementById("logNotes").value = existing?.notes || "";
-  logModal.classList.add("open");
-}
-
-function closeLogModal() {
-  logModal.classList.remove("open");
-  document.getElementById("datePickerGroup").style.display = "none";
-  document.getElementById("logDateInput").required = false;
-}
-
-document.getElementById("logWorkType").onchange = function () {
-  toggleLeaveFields(this.value === "leave");
-};
-
-logForm.onsubmit = async (e) => {
-  e.preventDefault();
-  const date = document.getElementById("logDate").value || document.getElementById("logDateInput").value;
-  if (!date) { alert("Please select a date"); return; }
-  const work_type = document.getElementById("logWorkType").value || "office";
-  const check_in = work_type === "leave" ? "" : document.getElementById("logCheckIn").value;
-  const check_out = work_type === "leave" ? "" : document.getElementById("logCheckOut").value;
-  const notes = document.getElementById("logNotes").value;
-  try {
-    await API.saveAttendance({ date, work_type, check_in, check_out, notes });
-    closeLogModal();
-    reload();
-  } catch (err) {
-    alert(err.message);
-  }
-};
-
-document.getElementById("cancelLog").onclick = closeLogModal;
-document.getElementById("addPastDateBtn").onclick = () => openLogModal(null, null);
-document.getElementById("logDateInput").onchange = function () {
-  document.getElementById("logDate").value = this.value;
-};
-
-logModal.onclick = (e) => { if (e.target === logModal) closeLogModal(); };
-
-// ── Mark today as leave ────────────────────────────────────────────────────
-
-document.getElementById("markLeaveBtn").onclick = async () => {
-  if (!confirm("Mark today as leave?")) return;
-  await API.saveAttendance({ date: todayStr(), work_type: "leave", check_in: "", check_out: "", notes: "" });
-  showToast("Today marked as leave");
-  reload();
-  loadWifiStatus();
-};
 
 // ── Settings ───────────────────────────────────────────────────────────────
 
