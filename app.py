@@ -42,12 +42,11 @@ def init_db():
         );
         INSERT OR IGNORE INTO settings (key, value) VALUES
             ('required_days_per_week', '2'),
-            ('reminder_enabled', 'true'),
-            ('office_wifi_ssid', 'ts Corp Network');
+            ('office_wifi_ssid', 'Corp-Network');
     """)
-    # Migrate empty office_wifi_ssid to the correct default
+    # Migrate office_wifi_ssid from old values
     conn.execute(
-        "UPDATE settings SET value = 'ts Corp Network' WHERE key = 'office_wifi_ssid' AND value = ''"
+        "UPDATE settings SET value = 'Corp-Network' WHERE key = 'office_wifi_ssid' AND value IN ('', 'ts Corp Network')"
     )
     # Add work_type column for existing DBs (SQLite has no IF NOT EXISTS for columns)
     cur = conn.cursor()
@@ -97,6 +96,9 @@ def add_attendance():
     """Add or update an attendance record."""
     data = request.get_json()
     date = data.get("date")
+    work_type = (data.get("work_type") or "office").strip().lower()
+    if work_type not in ("office", "remote", "leave"):
+        work_type = "office"
     check_in = data.get("check_in", "")
     check_out = data.get("check_out", "")
     notes = data.get("notes", "")
@@ -107,14 +109,14 @@ def add_attendance():
     cur.execute(
         """
         INSERT INTO attendance (date, work_type, check_in, check_out, notes)
-        VALUES (?, 'office', ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(date) DO UPDATE SET
-            work_type = 'office',
+            work_type = excluded.work_type,
             check_in = excluded.check_in,
             check_out = excluded.check_out,
             notes = excluded.notes
         """,
-        (date, check_in, check_out, notes),
+        (date, work_type, check_in, check_out, notes),
     )
     conn.commit()
     conn.close()
@@ -137,45 +139,51 @@ def _now_sydney():
 
 @app.route("/api/stats")
 def get_stats():
-    """Get attendance statistics for the current week and overall (Sydney time)."""
+    """Get attendance statistics for the current week (Sydney time)."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT value FROM settings WHERE key = 'required_days_per_week'")
     row = cur.fetchone()
-    required = int(row["value"]) if row else 3
+    required = int(row["value"]) if row else 2
 
     now = _now_sydney()
     today = now.strftime("%Y-%m-%d")
     week_start = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d")
     week_end = (now + timedelta(days=6 - now.weekday())).strftime("%Y-%m-%d")
 
-    # A day counts as attended if there's a record for that date.
-    # (Times are optional; users often only know which days they attended.)
     cur.execute(
-        "SELECT COUNT(*) as count FROM attendance WHERE date BETWEEN ? AND ?",
+        "SELECT COUNT(*) as count FROM attendance WHERE date BETWEEN ? AND ? AND work_type = 'office'",
         (week_start, week_end),
     )
-    days_this_week = cur.fetchone()["count"]
+    office_days_this_week = cur.fetchone()["count"]
 
-    cur.execute("SELECT COUNT(*) as count FROM attendance")
-    total_days = cur.fetchone()["count"]
+    cur.execute(
+        "SELECT COUNT(*) as count FROM attendance WHERE date BETWEEN ? AND ? AND work_type = 'remote'",
+        (week_start, week_end),
+    )
+    remote_days_this_week = cur.fetchone()["count"]
 
-    cur.execute("SELECT date FROM attendance ORDER BY date DESC LIMIT 1")
-    last_attendance = cur.fetchone()
-    last_date = last_attendance["date"] if last_attendance else None
+    cur.execute(
+        "SELECT COUNT(*) as count FROM attendance WHERE date BETWEEN ? AND ? AND work_type = 'leave'",
+        (week_start, week_end),
+    )
+    leave_days_this_week = cur.fetchone()["count"]
 
-    cur.execute("SELECT 1 FROM attendance WHERE date = ?", (today,))
-    today_logged = cur.fetchone() is not None
+    cur.execute("SELECT work_type FROM attendance WHERE date = ?", (today,))
+    today_row = cur.fetchone()
+    today_logged = today_row is not None
+    today_type = today_row["work_type"] if today_row else None
 
     conn.close()
 
     return jsonify(
         {
-            "days_this_week": days_this_week,
+            "office_days_this_week": office_days_this_week,
+            "remote_days_this_week": remote_days_this_week,
+            "leave_days_this_week": leave_days_this_week,
             "required_per_week": required,
-            "total_days": total_days,
-            "last_attendance_date": last_date,
             "today_logged": today_logged,
+            "today_type": today_type,
             "week_start": week_start,
             "week_end": week_end,
         }
@@ -244,8 +252,7 @@ def export_csv():
     conn.close()
     lines = ["date,work_type,check_in,check_out,notes"]
     for r in rows:
-        wt = r.get("work_type") or "office"
-        lines.append(f"{r['date']},{wt},{r['check_in'] or ''},{r['check_out'] or ''},{r['notes'] or ''}")
+        lines.append(f"{r['date']},{r['work_type'] or 'office'},{r['check_in'] or ''},{r['check_out'] or ''},{r['notes'] or ''}")
     return "\n".join(lines), 200, {"Content-Type": "text/csv", "Content-Disposition": "attachment; filename=attendance.csv"}
 
 

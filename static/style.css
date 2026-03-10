@@ -396,6 +396,67 @@ body {
     background: var(--accent);
 }
 
+.legend-swatch.legend-remote {
+    background: var(--accent-2);
+}
+
+/* Remote bar */
+.bar-remote .bar-fill {
+    background: var(--accent-2);
+}
+
+/* Today stat card states */
+.stat-card.today-office {
+    border-color: rgba(255, 46, 110, 0.35);
+    background: linear-gradient(135deg, rgba(255, 46, 110, 0.12) 0%, rgba(124, 58, 237, 0.08) 100%), var(--surface);
+}
+
+.stat-card.today-remote {
+    border-color: rgba(124, 58, 237, 0.35);
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.10) 0%, rgba(124, 58, 237, 0.05) 100%), var(--surface);
+}
+
+.stat-card.today-leave {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.10) 0%, rgba(245, 158, 11, 0.04) 100%), var(--surface);
+}
+
+/* Type badges in table */
+.type-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.type-office {
+    background: rgba(255, 46, 110, 0.12);
+    color: var(--accent);
+}
+
+.type-remote {
+    background: rgba(124, 58, 237, 0.12);
+    color: var(--accent-2);
+}
+
+.type-leave {
+    background: rgba(245, 158, 11, 0.12);
+    color: #b45309;
+}
+
+/* Leave button */
+.btn-leave {
+    color: #b45309;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.btn-leave:hover {
+    background: rgba(245, 158, 11, 0.08);
+    color: #92400e;
+    border-color: rgba(245, 158, 11, 0.5);
+}
+
 .table-wrap {
     overflow-x: auto;
     border: 1px solid var(--border);

@@ -60,23 +60,15 @@ function todayStr() {
   return `${y}-${m}-${day}`;
 }
 
-function march1Str() {
-  const y = new Date().getFullYear();
-  return `${y}-03-01`;
-}
-
-function firstMondayOnOrAfter(dateStr) {
-  const d = new Date(dateStr + "T12:00:00");
-  const day = d.getDay(); // 0=Sun..6=Sat
-  const offsetToMonday = (8 - day) % 7; // Mon => 0, Tue => 6, Sun => 1
-  d.setDate(d.getDate() + offsetToMonday);
-  return d.toISOString().slice(0, 10);
+function currentTimeStr() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
 function startOfWeekStr(dateStr) {
   const d = new Date(dateStr + "T12:00:00");
-  const day = d.getDay(); // 0=Sun..6=Sat
-  const mondayOffset = (day + 6) % 7; // Mon=0..Sun=6
+  const day = d.getDay();
+  const mondayOffset = (day + 6) % 7;
   d.setDate(d.getDate() - mondayOffset);
   return d.toISOString().slice(0, 10);
 }
@@ -91,35 +83,49 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 4000);
+}
+
+function reload() {
+  loadStats();
+  loadAttendance();
+  loadWeeklyGraphAndCumulative();
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+
 async function loadStats() {
   const s = await API.getStats();
-  document.getElementById("daysThisWeek").textContent = s.days_this_week;
+
+  document.getElementById("officeDays").textContent = s.office_days_this_week;
   document.getElementById("requiredDays").textContent = s.required_per_week;
-  document.getElementById("totalDays").textContent = s.total_days;
+  document.getElementById("remoteDays").textContent = s.remote_days_this_week;
+  document.getElementById("leaveDays").textContent = s.leave_days_this_week;
+
   const todayCard = document.getElementById("todayCard");
   const todayStatus = document.getElementById("todayStatus");
-  if (s.today_logged) {
-    todayStatus.textContent = "✓ Logged";
-    todayCard.classList.add("stat-primary");
-  } else {
-    todayStatus.textContent = "Not logged";
-    todayCard.classList.remove("stat-primary");
-  }
+  const typeLabels = { office: "Office", remote: "Remote", leave: "Leave" };
+  todayStatus.textContent = typeLabels[s.today_type] || "—";
+  todayCard.className = "stat-card" + (s.today_type ? ` today-${s.today_type}` : "");
 
-  const pct = Math.min(
-    100,
-    Math.round((s.days_this_week / s.required_per_week) * 100)
-  );
+  // Compliance bar: office days only vs required
+  const pct = Math.min(100, Math.round((s.office_days_this_week / s.required_per_week) * 100));
   const fill = document.getElementById("complianceFill");
   const bar = document.getElementById("complianceBar");
   const text = document.getElementById("complianceText");
   fill.style.width = `${pct}%`;
-  text.textContent = `${pct}% of weekly target (minimum 80%)`;
+  text.textContent = `${pct}% office attendance this week (min 80%)`;
   bar.classList.remove("warning", "danger", "success");
-  if (pct >= 100) bar.classList.add("success");
+  if (pct >= 80) bar.classList.add("success");
   else if (pct >= 50) bar.classList.add("warning");
   else bar.classList.add("danger");
 }
+
+// ── Weekly chart + cumulative ──────────────────────────────────────────────
 
 async function loadWeeklyGraphAndCumulative() {
   const s = await API.getStats();
@@ -129,18 +135,15 @@ async function loadWeeklyGraphAndCumulative() {
   const start = PERIOD_START;
   const end = todayStr() < PERIOD_END ? todayStr() : PERIOD_END;
   const rows = await API.getAttendance(start, end);
-  const attendedDates = new Set(rows.map((r) => r.date));
   const rowsByDate = new Map(rows.map((r) => [r.date, r]));
 
-  // Cumulative compliance by completed weeks only:
-  // - By end of this week => includes 2 weeks (last + this)
-  // - By end of next week => includes 3 weeks, etc.
+  // Cumulative compliance: office days only, completed weeks only
   const thisWeekStart = startOfWeekStr(end);
   const thisWeekEnd = addDaysStr(thisWeekStart, 6);
   const lastCompletedWeekEnd = end >= thisWeekEnd ? thisWeekEnd : addDaysStr(thisWeekStart, -1);
 
   let completedWeeks = 0;
-  let attendedInCompletedWeeks = 0;
+  let officeInCompletedWeeks = 0;
 
   if (lastCompletedWeekEnd >= start) {
     for (let ws = start; ws <= startOfWeekStr(lastCompletedWeekEnd); ws = addDaysStr(ws, 7)) {
@@ -148,17 +151,18 @@ async function loadWeeklyGraphAndCumulative() {
       for (let i = 0; i < 7; i++) {
         const d = addDaysStr(ws, i);
         if (d > lastCompletedWeekEnd) break;
-        if (attendedDates.has(d)) attendedInCompletedWeeks += 1;
+        const r = rowsByDate.get(d);
+        if (r && r.work_type === "office") officeInCompletedWeeks += 1;
       }
     }
   }
 
   const requiredTotal = completedWeeks * required;
-  const cumulativePct = requiredTotal > 0 ? Math.round((attendedInCompletedWeeks / requiredTotal) * 100) : 0;
+  const cumulativePct = requiredTotal > 0 ? Math.round((officeInCompletedWeeks / requiredTotal) * 100) : 0;
 
   document.getElementById("cumulativePct").textContent = `${clamp(cumulativePct, 0, 999)}%`;
-  document.getElementById("cumulativeLabel").textContent = `Cumulative (${completedWeeks} week${completedWeeks === 1 ? "" : "s"})`;
-  document.getElementById("cumulativeDetail").textContent = `${attendedInCompletedWeeks}/${requiredTotal} (min ${minPct}%)`;
+  document.getElementById("cumulativeLabel").textContent = `Cumulative (${completedWeeks} wk${completedWeeks === 1 ? "" : "s"})`;
+  document.getElementById("cumulativeDetail").textContent = `${officeInCompletedWeeks}/${requiredTotal} office days (min ${minPct}%)`;
 
   const cumulativeCard = document.getElementById("cumulativeCard");
   cumulativeCard.classList.remove("stat-primary");
@@ -166,46 +170,56 @@ async function loadWeeklyGraphAndCumulative() {
   if (requiredTotal > 0 && cumulativePct >= minPct) cumulativeCard.classList.add("stat-primary");
   else if (requiredTotal > 0) cumulativeCard.style.borderColor = "var(--warning)";
 
+  // Build per-week data
   const weekStart = startOfWeekStr(start);
   const endWeekStart = startOfWeekStr(end);
-
   const weeks = [];
   for (let ws = weekStart; ws <= endWeekStart; ws = addDaysStr(ws, 7)) {
     const we = addDaysStr(ws, 6);
-    let attended = 0;
+    let office = 0, remote = 0, leave = 0;
     for (let i = 0; i < 7; i++) {
       const d = addDaysStr(ws, i);
       if (d < start || d > end) continue;
-      if (attendedDates.has(d)) attended += 1;
+      const r = rowsByDate.get(d);
+      if (!r) continue;
+      if (r.work_type === "office") office++;
+      else if (r.work_type === "remote") remote++;
+      else if (r.work_type === "leave") leave++;
     }
-    const pct = required > 0 ? Math.round((attended / required) * 100) : 0;
-    weeks.push({ ws, we, attended, pct });
+    const pct = required > 0 ? Math.round((office / required) * 100) : 0;
+    weeks.push({ ws, we, office, remote, leave, pct });
   }
 
-  // Scale: 5 days = 100% height for each bar
+  // Chart: office bar + remote bar side by side, 5 days = 100% height
   const maxDays = 5;
   const chart = document.getElementById("weeklyChart");
   chart.innerHTML = "";
   weeks.slice(-14).forEach((w) => {
     const group = document.createElement("div");
     group.className = "bar-group";
-    const officePct = Math.round((w.attended / maxDays) * 100);
 
     const barRow = document.createElement("div");
     barRow.className = "bar-group-row";
-    const bar = document.createElement("div");
-    bar.className = "bar bar-office" + (w.pct < minPct ? " warn" : "");
-    const fill = document.createElement("div");
-    fill.className = "bar-fill";
-    fill.style.height = `${clamp(officePct, 0, 120)}%`;
-    const label = document.createElement("div");
-    label.className = "bar-label";
-    label.textContent = w.attended;
-    bar.title = `Week ${w.ws} to ${w.we}\n${w.attended}/${required} days`;
-    bar.appendChild(fill);
-    bar.appendChild(label);
-    barRow.appendChild(bar);
+
+    const makeBar = (type, count) => {
+      const bar = document.createElement("div");
+      bar.className = `bar bar-${type}${type === "office" && w.pct < minPct ? " warn" : ""}`;
+      const fill = document.createElement("div");
+      fill.className = "bar-fill";
+      fill.style.height = `${clamp(Math.round((count / maxDays) * 100), 0, 120)}%`;
+      const label = document.createElement("div");
+      label.className = "bar-label";
+      label.textContent = count || "";
+      bar.title = `Week ${w.ws}\nOffice: ${w.office}  Remote: ${w.remote}  Leave: ${w.leave}\nOffice target: ${w.office}/${required}`;
+      bar.appendChild(fill);
+      bar.appendChild(label);
+      return bar;
+    };
+
+    barRow.appendChild(makeBar("office", w.office));
+    barRow.appendChild(makeBar("remote", w.remote));
     group.appendChild(barRow);
+
     const weekLabel = document.createElement("div");
     weekLabel.className = "bar-week";
     weekLabel.textContent = w.ws.slice(5);
@@ -214,21 +228,29 @@ async function loadWeeklyGraphAndCumulative() {
   });
 }
 
+// ── Attendance table ───────────────────────────────────────────────────────
+
 async function loadAttendance() {
   const rows = await API.getAttendance();
   const tbody = document.getElementById("attendanceBody");
   if (rows.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="6" class="empty-state">No attendance logged yet. Click "Log today\'s attendance" to start.</td></tr>';
+      '<tr><td colspan="5" class="empty-state">No attendance logged yet. Open the app at work or home — it auto-logs based on WiFi.</td></tr>';
     return;
   }
+
+  const typeBadge = (wt) => {
+    const labels = { office: "Office", remote: "Remote", leave: "Leave" };
+    return `<span class="type-badge type-${wt}">${labels[wt] || wt}</span>`;
+  };
+
   tbody.innerHTML = rows
     .map(
       (r) => `
     <tr>
       <td>${formatDate(r.date)}</td>
+      <td>${typeBadge(r.work_type)}</td>
       <td>${r.check_in || "—"}</td>
-      <td>${r.check_out || "—"}</td>
       <td>${r.notes || "—"}</td>
       <td class="actions-cell">
         <button class="btn btn-ghost btn-sm edit-btn" data-date="${r.date}">Edit</button>
@@ -247,21 +269,27 @@ async function loadAttendance() {
     b.onclick = async () => {
       if (confirm("Delete this record?")) {
         await API.deleteAttendance(b.dataset.date);
-        loadAttendance();
-        loadStats();
+        reload();
       }
     };
   });
 }
 
+// ── Log modal (past dates + edits only) ───────────────────────────────────
+
 const logModal = document.getElementById("logModal");
 const logForm = document.getElementById("logForm");
 const modalTitle = document.getElementById("modalTitle");
 
+function toggleLeaveFields(isLeave) {
+  document.getElementById("checkInGroup").style.display = isLeave ? "none" : "";
+  document.getElementById("checkOutGroup").style.display = isLeave ? "none" : "";
+}
+
 async function openLogModal(date, existing) {
   const datePickerGroup = document.getElementById("datePickerGroup");
   const dateInput = document.getElementById("logDateInput");
-  const isPastDate = date === null && !existing;
+  const isPastDate = !date && !existing;
 
   if (isPastDate) {
     datePickerGroup.style.display = "block";
@@ -272,11 +300,13 @@ async function openLogModal(date, existing) {
   } else {
     datePickerGroup.style.display = "none";
     dateInput.required = false;
-    const d = date || todayStr();
-    document.getElementById("logDate").value = d;
-    modalTitle.textContent = d === todayStr() ? "Log today's attendance" : `Log attendance for ${formatDate(d)}`;
+    document.getElementById("logDate").value = date;
+    modalTitle.textContent = `Edit ${formatDate(date)}`;
   }
 
+  const wt = existing?.work_type || "office";
+  document.getElementById("logWorkType").value = wt;
+  toggleLeaveFields(wt === "leave");
   document.getElementById("logCheckIn").value = existing?.check_in || "";
   document.getElementById("logCheckOut").value = existing?.check_out || "";
   document.getElementById("logNotes").value = existing?.notes || "";
@@ -289,35 +319,46 @@ function closeLogModal() {
   document.getElementById("logDateInput").required = false;
 }
 
+document.getElementById("logWorkType").onchange = function () {
+  toggleLeaveFields(this.value === "leave");
+};
+
 logForm.onsubmit = async (e) => {
   e.preventDefault();
   const date = document.getElementById("logDate").value || document.getElementById("logDateInput").value;
-  if (!date) {
-    alert("Please select a date");
-    return;
-  }
-  const check_in = document.getElementById("logCheckIn").value;
-  const check_out = document.getElementById("logCheckOut").value;
+  if (!date) { alert("Please select a date"); return; }
+  const work_type = document.getElementById("logWorkType").value || "office";
+  const check_in = work_type === "leave" ? "" : document.getElementById("logCheckIn").value;
+  const check_out = work_type === "leave" ? "" : document.getElementById("logCheckOut").value;
   const notes = document.getElementById("logNotes").value;
   try {
-    await API.saveAttendance({ date, check_in, check_out, notes });
+    await API.saveAttendance({ date, work_type, check_in, check_out, notes });
     closeLogModal();
-    loadAttendance();
-    loadStats();
-    loadWeeklyGraphAndCumulative();
+    reload();
   } catch (err) {
     alert(err.message);
   }
 };
 
 document.getElementById("cancelLog").onclick = closeLogModal;
-document.getElementById("logTodayBtn").onclick = () => openLogModal();
-
-document.getElementById("addPastDateBtn").onclick = () => openLogModal(null);
-
+document.getElementById("addPastDateBtn").onclick = () => openLogModal(null, null);
 document.getElementById("logDateInput").onchange = function () {
   document.getElementById("logDate").value = this.value;
 };
+
+logModal.onclick = (e) => { if (e.target === logModal) closeLogModal(); };
+
+// ── Mark today as leave ────────────────────────────────────────────────────
+
+document.getElementById("markLeaveBtn").onclick = async () => {
+  if (!confirm("Mark today as leave?")) return;
+  await API.saveAttendance({ date: todayStr(), work_type: "leave", check_in: "", check_out: "", notes: "" });
+  showToast("Today marked as leave");
+  reload();
+  loadWifiStatus();
+};
+
+// ── Settings ───────────────────────────────────────────────────────────────
 
 const settingsModal = document.getElementById("settingsModal");
 const settingsForm = document.getElementById("settingsForm");
@@ -344,51 +385,22 @@ settingsForm.onsubmit = async (e) => {
   const officeWifi = document.getElementById("officeWifiInput").value.trim();
   await API.updateSettings({ required_days_per_week: required, office_wifi_ssid: officeWifi });
   settingsModal.classList.remove("open");
-  loadStats();
-  loadWeeklyGraphAndCumulative();
+  reload();
   loadWifiStatus();
 };
 
-logModal.onclick = (e) => {
-  if (e.target === logModal) closeLogModal();
-};
 settingsModal.onclick = (e) => {
   if (e.target === settingsModal) settingsModal.classList.remove("open");
 };
 
-function showToast(msg) {
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 4000);
-}
-
-async function autoLogIfAtOffice() {
-  try {
-    const [wifi, stats] = await Promise.all([API.getWifi(), API.getStats()]);
-    if (wifi.at_office && !stats.today_logged) {
-      const now = new Date();
-      const checkIn = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      await API.saveAttendance({ date: todayStr(), check_in: checkIn, check_out: "", notes: "" });
-      showToast(`Auto-logged — you're at the office! Check-in: ${checkIn}`);
-      loadStats();
-      loadAttendance();
-      loadWeeklyGraphAndCumulative();
-    }
-  } catch {
-    // silently skip if wifi check fails
-  }
-}
+// ── WiFi status indicator ──────────────────────────────────────────────────
 
 async function loadWifiStatus() {
   const el = document.getElementById("wifiStatus");
   try {
     const w = await API.getWifi();
-    if (!w.office_ssid) {
-      el.textContent = "Set office WiFi in settings";
-      el.className = "wifi-status wifi-unknown";
-    } else if (!w.ssid) {
-      el.textContent = "WiFi not detected";
+    if (!w.ssid) {
+      el.textContent = "No WiFi detected";
       el.className = "wifi-status wifi-unknown";
     } else if (w.at_office) {
       el.textContent = `At office · ${w.ssid}`;
@@ -402,11 +414,47 @@ async function loadWifiStatus() {
   }
 }
 
+// ── Auto-log based on WiFi ─────────────────────────────────────────────────
+// Weekdays only. Office WiFi → log/upgrade to office. Other WiFi → log as remote.
+// Never overwrites a leave record. Never runs on weekends.
+
+async function autoLogIfNeeded() {
+  try {
+    const dow = new Date().getDay();
+    if (dow === 0 || dow === 6) return; // skip weekends
+
+    const [wifi, stats] = await Promise.all([API.getWifi(), API.getStats()]);
+    if (!wifi.ssid) return; // no wifi, skip
+
+    const checkIn = currentTimeStr();
+
+    if (wifi.at_office) {
+      // At office: log or upgrade from remote → office (don't touch leave)
+      if (!stats.today_logged || stats.today_type === "remote") {
+        await API.saveAttendance({ date: todayStr(), work_type: "office", check_in: checkIn, check_out: "", notes: "" });
+        showToast(`Office day logged · Check-in: ${checkIn}`);
+        reload();
+      }
+    } else {
+      // At home: only log if not yet logged for today
+      if (!stats.today_logged) {
+        await API.saveAttendance({ date: todayStr(), work_type: "remote", check_in: checkIn, check_out: "", notes: "" });
+        showToast(`Remote day logged · Working from home`);
+        reload();
+      }
+    }
+  } catch {
+    // silently skip if wifi check fails
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
 async function init() {
   await loadStats();
   await loadAttendance();
   await loadWeeklyGraphAndCumulative();
-  await autoLogIfAtOffice();
+  await autoLogIfNeeded();
   await loadWifiStatus();
 }
 

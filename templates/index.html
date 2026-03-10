@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vaishnavi’s Office Attendance Tracker</title>
+    <title>Vaishnavi's Office Attendance Tracker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
@@ -12,54 +12,59 @@
 <body>
     <div class="app">
         <header class="header">
-            <h1>Vaishnavi’s Office Attendance Tracker.</h1>
+            <h1>Vaishnavi's Office Attendance Tracker.</h1>
             <p class="subtitle">
-                Working in Prezzee. Attendance compliance target is <strong>80%</strong> and more.
+                Working in Prezzee. Attendance compliance target is <strong>80%</strong> office days.
             </p>
             <button class="btn btn-icon" id="settingsBtn" title="Settings">⚙️</button>
         </header>
 
         <section class="stats">
-            <div class="stat-card stat-primary">
-                <span class="stat-value" id="daysThisWeek">0</span>
-                <span class="stat-label">Days this week</span>
-                <span class="stat-target">/ <span id="requiredDays">3</span> required</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value" id="totalDays">0</span>
-                <span class="stat-label">Total days logged</span>
-            </div>
-            <div class="stat-card" id="todayCard">
+            <div class="stat-card today-office" id="todayCard">
                 <span class="stat-value" id="todayStatus">—</span>
                 <span class="stat-label">Today</span>
             </div>
+            <div class="stat-card">
+                <span class="stat-value" id="officeDays">0</span>
+                <span class="stat-label">Office this week</span>
+                <span class="stat-target">/ <span id="requiredDays">2</span> required</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="remoteDays">0</span>
+                <span class="stat-label">Remote this week</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="leaveDays">0</span>
+                <span class="stat-label">Leave this week</span>
+            </div>
             <div class="stat-card" id="cumulativeCard">
                 <span class="stat-value" id="cumulativePct">0%</span>
-                <span class="stat-label" id="cumulativeLabel">Cumulative</span>
+                <span class="stat-label" id="cumulativeLabel">Cumulative office</span>
                 <span class="stat-target" id="cumulativeDetail">0/0 (min 80%)</span>
             </div>
         </section>
 
         <div class="compliance-bar" id="complianceBar">
             <div class="compliance-fill" id="complianceFill"></div>
-            <span class="compliance-text" id="complianceText">0% of weekly target</span>
         </div>
+        <span class="compliance-text" id="complianceText">0% office attendance this week (min 80%)</span>
 
-        <section class="attendance-section" style="margin-top: 1.25rem;">
+        <section class="attendance-section" style="margin-top: 1.5rem;">
             <h2>Weekly graph <span class="period-label">Mar 2 – Jun 30, 2026</span></h2>
             <div class="chart-wrap">
                 <div class="chart" id="weeklyChart" aria-label="Weekly attendance chart"></div>
                 <div class="chart-legend">
                     <span class="legend-item"><span class="legend-swatch legend-office"></span> Office</span>
-                    <span class="legend-item"><span class="legend-swatch ok"></span> On track</span>
+                    <span class="legend-item"><span class="legend-swatch legend-remote"></span> Remote</span>
+                    <span class="legend-item"><span class="legend-swatch ok"></span> On track (≥80%)</span>
                     <span class="legend-item"><span class="legend-swatch warn"></span> Below 80%</span>
                 </div>
             </div>
         </section>
 
         <section class="actions">
-            <button class="btn btn-primary" id="logTodayBtn">Log today's attendance</button>
-            <button class="btn btn-ghost" id="addPastDateBtn">Add past date</button>
+            <button class="btn btn-ghost btn-leave" id="markLeaveBtn">Mark today as leave</button>
+            <button class="btn btn-ghost" id="addPastDateBtn">Add / edit past date</button>
             <div id="wifiStatus" class="wifi-status wifi-unknown"></div>
         </section>
 
@@ -70,8 +75,8 @@
                     <thead>
                         <tr>
                             <th>Date</th>
+                            <th>Type</th>
                             <th>Check in</th>
-                            <th>Check out</th>
                             <th>Notes</th>
                             <th></th>
                         </tr>
@@ -83,9 +88,10 @@
         </section>
     </div>
 
+    <!-- Log modal (past dates / edits) -->
     <div class="modal" id="logModal">
         <div class="modal-content">
-            <h3 id="modalTitle">Log attendance</h3>
+            <h3 id="modalTitle">Add past date</h3>
             <form id="logForm">
                 <input type="hidden" id="logDate">
                 <div class="form-group" id="datePickerGroup" style="display: none;">
@@ -93,16 +99,24 @@
                     <input type="date" id="logDateInput" name="date">
                 </div>
                 <div class="form-group">
+                    <label for="logWorkType">Type</label>
+                    <select id="logWorkType" name="work_type">
+                        <option value="office">Office</option>
+                        <option value="remote">Remote</option>
+                        <option value="leave">Leave</option>
+                    </select>
+                </div>
+                <div class="form-group" id="checkInGroup">
                     <label for="logCheckIn">Check in</label>
                     <input type="time" id="logCheckIn" name="check_in">
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="checkOutGroup">
                     <label for="logCheckOut">Check out</label>
                     <input type="time" id="logCheckOut" name="check_out">
                 </div>
                 <div class="form-group">
                     <label for="logNotes">Notes (optional)</label>
-                    <input type="text" id="logNotes" name="notes" placeholder="e.g. WFH morning, office afternoon">
+                    <input type="text" id="logNotes" name="notes" placeholder="Optional note">
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-ghost" id="cancelLog">Cancel</button>
@@ -112,6 +126,7 @@
         </div>
     </div>
 
+    <!-- Settings modal -->
     <div class="modal" id="settingsModal">
         <div class="modal-content">
             <h3>Settings</h3>
@@ -126,8 +141,8 @@
                 </div>
                 <div class="form-group" style="margin-top: 1rem;">
                     <label for="officeWifiInput">Office WiFi network name</label>
-                    <input type="text" id="officeWifiInput" name="office_wifi_ssid" placeholder="e.g. Prezzee-Office">
-                    <span class="settings-hint">Used to detect if you're at the office</span>
+                    <input type="text" id="officeWifiInput" name="office_wifi_ssid" placeholder="e.g. Corp-Network">
+                    <span class="settings-hint">Connecting to this network auto-logs an office day</span>
                 </div>
                 <p class="settings-note">This tracker is set up for Vaishnavi. (Presets are kept for convenience.)</p>
                 <div class="form-actions">
