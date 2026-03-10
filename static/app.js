@@ -105,11 +105,10 @@ async function loadStats() {
   document.getElementById("remoteDays").textContent = s.remote_days_this_week;
   document.getElementById("leaveDays").textContent = s.leave_days_this_week;
 
-  const todayCard = document.getElementById("todayCard");
-  const todayStatus = document.getElementById("todayStatus");
   const typeLabels = { office: "Office", remote: "Remote", leave: "Leave" };
-  todayStatus.textContent = typeLabels[s.today_type] || "—";
-  todayCard.className = "stat-card" + (s.today_type ? ` today-${s.today_type}` : "");
+  const badge = document.getElementById("todayBadge");
+  badge.textContent = "Today: " + (typeLabels[s.today_type] || "—");
+  badge.className = "today-pill" + (s.today_type ? ` pill-${s.today_type}` : "");
 
   // Compliance bar: office days only vs required
   const pct = Math.min(100, Math.round((s.office_days_this_week / s.required_per_week) * 100));

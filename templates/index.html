@@ -20,26 +20,30 @@
         </header>
 
         <section class="stats">
-            <div class="stat-card today-office" id="todayCard">
-                <span class="stat-value" id="todayStatus">—</span>
-                <span class="stat-label">Today</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value" id="officeDays">0</span>
-                <span class="stat-label">Office this week</span>
-                <span class="stat-target">/ <span id="requiredDays">2</span> required</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value" id="remoteDays">0</span>
-                <span class="stat-label">Remote this week</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value" id="leaveDays">0</span>
-                <span class="stat-label">Leave this week</span>
+            <div class="week-summary-card">
+                <div class="wsc-header">
+                    <span class="wsc-title">This week</span>
+                    <span class="today-pill" id="todayBadge">Today: —</span>
+                </div>
+                <div class="wsc-grid">
+                    <div class="wsc-col">
+                        <span class="wsc-label wsc-office">Office</span>
+                        <span class="wsc-value" id="officeDays">0</span>
+                        <span class="wsc-sub">/ <span id="requiredDays">2</span> required</span>
+                    </div>
+                    <div class="wsc-col">
+                        <span class="wsc-label wsc-remote">Remote</span>
+                        <span class="wsc-value" id="remoteDays">0</span>
+                    </div>
+                    <div class="wsc-col">
+                        <span class="wsc-label wsc-leave">Leave</span>
+                        <span class="wsc-value" id="leaveDays">0</span>
+                    </div>
+                </div>
             </div>
             <div class="stat-card" id="cumulativeCard">
-                <span class="stat-value" id="cumulativePct">0%</span>
                 <span class="stat-label" id="cumulativeLabel">Cumulative office</span>
+                <span class="stat-value" id="cumulativePct">0%</span>
                 <span class="stat-target" id="cumulativeDetail">0/0 (min 80%)</span>
             </div>
         </section>
