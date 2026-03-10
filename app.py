@@ -42,12 +42,8 @@ def init_db():
         );
         INSERT OR IGNORE INTO settings (key, value) VALUES
             ('required_days_per_week', '2'),
-            ('office_wifi_ssid', 'Corp-Network');
+            ('office_ip_prefix', '10.10.');
     """)
-    # Migrate office_wifi_ssid from old values
-    conn.execute(
-        "UPDATE settings SET value = 'Corp-Network' WHERE key = 'office_wifi_ssid' AND value IN ('', 'ts Corp Network')"
-    )
     # Add work_type column for existing DBs (SQLite has no IF NOT EXISTS for columns)
     cur = conn.cursor()
     cur.execute("SELECT 1 FROM pragma_table_info('attendance') WHERE name='work_type'")
@@ -216,33 +212,30 @@ def update_settings():
 
 @app.route("/api/wifi")
 def get_wifi():
-    """Detect current WiFi SSID and whether it matches the configured office network."""
-    ssid = None
-    wifi_disconnected = False
-    for iface in ["en0", "en1", "en2"]:
+    """Detect current IP and whether it matches the configured office network prefix."""
+    ip = None
+    for iface in ["en0", "en1", "en12", "en2"]:
         try:
             result = subprocess.run(
-                ["networksetup", "-getairportnetwork", iface],
+                ["ipconfig", "getifaddr", iface],
                 capture_output=True, text=True, timeout=3
             )
-            output = result.stdout.strip()
-            if output.startswith("Current Wi-Fi Network:"):
-                ssid = output.split(":", 1)[1].strip()
+            candidate = result.stdout.strip()
+            if candidate and not candidate.startswith("127."):
+                ip = candidate
                 break
-            elif "not associated" in output.lower():
-                wifi_disconnected = True  # interface exists but not connected
         except Exception:
             continue
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT value FROM settings WHERE key = 'office_wifi_ssid'")
+    cur.execute("SELECT value FROM settings WHERE key = 'office_ip_prefix'")
     row = cur.fetchone()
-    office_ssid = row["value"] if row else ""
+    office_ip_prefix = row["value"] if row else "10.10."
     conn.close()
 
-    at_office = bool(ssid and office_ssid and ssid == office_ssid)
-    return jsonify({"ssid": ssid, "office_ssid": office_ssid, "at_office": at_office, "wifi_disconnected": wifi_disconnected})
+    at_office = bool(ip and ip.startswith(office_ip_prefix))
+    return jsonify({"ip": ip, "office_ip_prefix": office_ip_prefix, "at_office": at_office})
 
 
 @app.route("/api/forecast")

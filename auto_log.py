@@ -14,16 +14,16 @@ TIMEZONE = ZoneInfo("Australia/Sydney")
 DB_PATH  = Path(__file__).parent / "attendance.db"
 
 
-def get_wifi_ssid():
-    for iface in ["en0", "en1", "en2"]:
+def get_current_ip():
+    for iface in ["en0", "en1", "en12", "en2"]:
         try:
             result = subprocess.run(
-                ["networksetup", "-getairportnetwork", iface],
+                ["ipconfig", "getifaddr", iface],
                 capture_output=True, text=True, timeout=3,
             )
-            output = result.stdout.strip()
-            if output.startswith("Current Wi-Fi Network:"):
-                return output.split(":", 1)[1].strip()
+            ip = result.stdout.strip()
+            if ip and not ip.startswith("127."):
+                return ip
         except Exception:
             continue
     return None
@@ -43,25 +43,25 @@ def main():
     conn.row_factory = sqlite3.Row
     cur  = conn.cursor()
 
-    # Read office WiFi name from settings
-    cur.execute("SELECT value FROM settings WHERE key = 'office_wifi_ssid'")
+    # Read office IP prefix from settings
+    cur.execute("SELECT value FROM settings WHERE key = 'office_ip_prefix'")
     row = cur.fetchone()
-    office_ssid = row["value"] if row else "Corp-Network"
+    office_ip_prefix = row["value"] if row else "10.10."
 
     # Check what's already logged for today
     cur.execute("SELECT work_type FROM attendance WHERE date = ?", (today,))
     existing   = cur.fetchone()
     today_type = existing["work_type"] if existing else None
 
-    ssid      = get_wifi_ssid()
-    at_office = bool(ssid and ssid == office_ssid)
+    ip        = get_current_ip()
+    at_office = bool(ip and ip.startswith(office_ip_prefix))
 
     # Decide what to log
     work_type = None
     if at_office:
-        if today_type != "office":          # Corp-Network always wins
+        if today_type != "office":          # Office IP always wins
             work_type = "office"
-    elif ssid:
+    elif ip:
         if not today_type:                  # Other network → remote (once)
             work_type = "remote"
     else:
@@ -83,7 +83,7 @@ def main():
             (today, work_type, ci),
         )
         conn.commit()
-        print(f"[{now.strftime('%Y-%m-%d %H:%M')}] {today} → {work_type} (WiFi: {ssid or 'none'})")
+        print(f"[{now.strftime('%Y-%m-%d %H:%M')}] {today} → {work_type} (IP: {ip or 'none'})")
     else:
         print(f"[{now.strftime('%Y-%m-%d %H:%M')}] {today} already logged as {today_type}, skipped")
 

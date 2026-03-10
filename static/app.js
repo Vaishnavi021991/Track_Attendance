@@ -240,7 +240,7 @@ const settingsForm = document.getElementById("settingsForm");
 document.getElementById("settingsBtn").onclick = async () => {
   const s = await API.getSettings();
   document.getElementById("requiredDaysInput").value = s.required_days_per_week || 2;
-  document.getElementById("officeWifiInput").value = s.office_wifi_ssid || "";
+  document.getElementById("officeIpInput").value = s.office_ip_prefix || "10.10.";
   settingsModal.classList.add("open");
 };
 
@@ -256,8 +256,8 @@ document.getElementById("closeSettings").onclick = () =>
 settingsForm.onsubmit = async (e) => {
   e.preventDefault();
   const required = document.getElementById("requiredDaysInput").value;
-  const officeWifi = document.getElementById("officeWifiInput").value.trim();
-  await API.updateSettings({ required_days_per_week: required, office_wifi_ssid: officeWifi });
+  const officeIp = document.getElementById("officeIpInput").value.trim();
+  await API.updateSettings({ required_days_per_week: required, office_ip_prefix: officeIp });
   settingsModal.classList.remove("open");
   reload();
   loadWifiStatus();
@@ -307,14 +307,14 @@ async function loadWifiStatus() {
   const el = document.getElementById("wifiStatus");
   try {
     const w = await API.getWifi();
-    if (!w.ssid) {
-      el.textContent = w.wifi_disconnected ? "WiFi not connected" : "No WiFi interface found";
+    if (!w.ip) {
+      el.textContent = "No network detected";
       el.className = "wifi-status wifi-unknown";
     } else if (w.at_office) {
-      el.textContent = `At office · ${w.ssid}`;
+      el.textContent = `At office · ${w.ip}`;
       el.className = "wifi-status wifi-office";
     } else {
-      el.textContent = `At home · ${w.ssid}`;
+      el.textContent = `At home · ${w.ip}`;
       el.className = "wifi-status wifi-home";
     }
   } catch {
@@ -341,11 +341,11 @@ async function autoLogIfNeeded() {
         showToast(`Office day logged · Check-in: ${checkIn}`);
         reload();
       }
-    } else if (wifi.ssid) {
+    } else if (wifi.ip) {
       // On some other network: log as remote
       if (!stats.today_logged) {
         await API.saveAttendance({ date: todayStr(), work_type: "remote", check_in: checkIn, check_out: "", notes: "" });
-        showToast(`Remote day logged · ${wifi.ssid}`);
+        showToast(`Remote day logged · ${wifi.ip}`);
         reload();
       }
     } else {
